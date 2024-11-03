@@ -1,19 +1,69 @@
 #!/bin/bash
 
-# Install LXQt and LightDM using Portage with binary preference
-echo "Installing LXQt and LightDM using binary packages if available..."
-emerge -gav lxqt-meta lightdm lightdm-gtk-greeter
+# Ensure we are running as root
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Please run this script as root."
+  exit 1
+fi
 
-# Enable LightDM to start at boot with systemd
-echo "Enabling LightDM as the display manager..."
-systemctl enable lightdm
-systemctl start lightdm
+# Install LXQt, Hyprland, and SDDM using binary packages if available
+echo "Installing LXQt, Hyprland, and SDDM using binary packages only..."
+emerge -gav --getbinpkgonly lxqt-meta hyprland sddm lightdm-gtk-greeter
 
-# Set LXQt as the default session for LightDM
-echo "Configuring LightDM to use LXQt session..."
+# Remove Openbox if installed
+echo "Removing Openbox to avoid conflicts..."
+emerge -Cav x11-wm/openbox
+
+# Enable SDDM to start at boot with OpenRC
+echo "Configuring SDDM as the display manager with OpenRC..."
+rc-update add sddm default
+rc-service sddm start
+
+# Install and apply the Space theme for SDDM
+echo "Installing and configuring the Space theme for SDDM..."
+SPACE_THEME_DIR="/usr/share/sddm/themes/space"
+if [ ! -d "$SPACE_THEME_DIR" ]; then
+  git clone https://github.com/PapirusDevelopmentTeam/space-sddm-theme.git "$SPACE_THEME_DIR"
+fi
+
+# Set the Space theme as default in SDDM configuration
+echo "Setting SDDM theme to Space..."
+echo "[Theme]
+Current=space
+" > /etc/sddm.conf.d/00_theme.conf
+
+# Configure LightDM for LXQt to use Hyprland as the compositor
+echo "Configuring LightDM to use LXQt session with Hyprland as the compositor..."
 echo "[Seat:*]
 user-session=lxqt
 greeter-session=lightdm-gtk-greeter
 " > /etc/lightdm/lightdm.conf
 
-echo "Installation and setup complete. LightDM is now configured to use LXQt as the default desktop environment."
+# Set LXQt to use a dark theme and Hyprland as the compositor
+echo "Configuring LXQt to use a dark theme and Hyprland as the compositor..."
+
+# Create or modify the LXQt configuration file for the dark theme
+mkdir -p /etc/xdg/lxqt
+cat <<EOL > /etc/xdg/lxqt/session.conf
+[General]
+__userfile__=false
+theme=dark
+
+[Environment]
+WINDOW_MANAGER=Hyprland
+EOL
+
+# Ensure Hyprland starts with LXQt
+echo "Setting up Hyprland as the default compositor..."
+echo 'export XDG_SESSION_TYPE=wayland' >> /etc/environment
+mkdir -p /etc/xdg/lxqt/config/autostart
+echo '[Desktop Entry]
+Type=Application
+Exec=Hyprland
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=Hyprland' > /etc/xdg/lxqt/config/autostart/Hyprland.desktop
+
+# Final message
+echo "Installation and setup complete. SDDM is now configured with the Space theme, LXQt uses a dark theme, and Hyprland is set as the default compositor."
