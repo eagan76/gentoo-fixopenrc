@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Install LXQt and LightDM using Portage with binary preference
+echo "Installing LXQt and LightDM using binary packages if available..."
+emerge -gav lxqt-meta lightdm lightdm-gtk-greeter
+
+# Enable LightDM to start at boot with systemd
+echo "Enabling LightDM as the display manager..."
+systemctl enable lightdm
+systemctl start lightdm
+
+# Set LXQt as the default session for LightDM
+echo "Configuring LightDM to use LXQt session..."
+echo "[Seat:*]
+user-session=lxqt
+greeter-session=lightdm-gtk-greeter
+" > /etc/lightdm/lightdm.conf
+
+echo "Installation and setup complete. LightDM is now configured to use LXQt as the default desktop environment."
